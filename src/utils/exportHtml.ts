@@ -96,10 +96,23 @@ export function generateStandaloneHtml(pages: DocumentPage[], docTitle: string =
       background: #ffffff;
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
       overflow: hidden;
+      /* Treat each sheet as an isolated, monolithic box. Without this, an
+         element positioned past the sheet's bottom edge (top + height >
+         PAGE_HEIGHT) is only *visually* clipped by overflow:hidden — Chromium
+         still walks that overflowing absolutely-positioned content during print
+         fragmentation and emits an extra page per sheet. Size containment makes
+         the fixed W x H box independent of its contents so the printed page
+         count matches the on-screen sheet count. */
+      contain: strict;
       page-break-after: always;
       break-after: page;
       page-break-inside: avoid;
       break-inside: avoid;
+    }
+
+    .page-sheet:last-child {
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     @page {
@@ -126,6 +139,10 @@ export function generateStandaloneHtml(pages: DocumentPage[], docTitle: string =
         break-after: page !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
+      }
+      .page-sheet:last-child {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
       }
     }
   </style>
