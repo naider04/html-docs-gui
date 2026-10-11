@@ -22,6 +22,8 @@ import {
   ArrowDownToLine,
   ArrowLeftToLine,
   ArrowRightToLine,
+  Play,
+  Square,
 } from 'lucide-react';
 
 interface ElementInspectorProps {
@@ -34,6 +36,8 @@ interface ElementInspectorProps {
   onSendBackward: () => void;
   onOpenEmbedEditor?: () => void;
   onAlignImagePosition?: (position: 'left' | 'right' | 'beneath') => void;
+  isInteractive?: boolean;
+  onToggleInteractive?: () => void;
 }
 
 const FONT_OPTIONS = [
@@ -70,6 +74,8 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
   onSendBackward,
   onOpenEmbedEditor,
   onAlignImagePosition,
+  isInteractive = false,
+  onToggleInteractive,
 }) => {
   if (!element) return null;
 
@@ -358,6 +364,36 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
       {/* EMBED CONTROLS */}
       {element.type === 'embed' && (
         <div className="flex items-center gap-2">
+          {/* Interact / Test Live Mode Toggle */}
+          {onToggleInteractive && (
+            <button
+              onClick={onToggleInteractive}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                isInteractive
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                  : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border border-neutral-300 shadow-xs'
+              }`}
+              title={
+                isInteractive
+                  ? 'Exit live interaction to reposition/resize element'
+                  : 'Interact with embedded buttons, forms, and scripts'
+              }
+            >
+              {isInteractive ? (
+                <>
+                  <Square className="w-3 h-3 fill-current" />
+                  <span>Done Testing</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3 h-3 fill-current text-emerald-600" />
+                  <span>Interact</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Edit HTML + CSS + JS Button */}
           <button
             onClick={onOpenEmbedEditor}
             className="flex items-center gap-1.5 px-3 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-medium transition-colors"
@@ -365,6 +401,7 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
             <CodeIcon className="w-3.5 h-3.5" />
             <span>Edit HTML + CSS + JS</span>
           </button>
+
           <span className="text-[11px] text-neutral-400">
             Interactive sandboxed renderer
           </span>

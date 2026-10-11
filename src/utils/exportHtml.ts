@@ -21,7 +21,14 @@ export function renderElementHtml(el: DocElement): string {
   }
 
   if (el.type === 'embed') {
-    const combinedContent = `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:sans-serif;} ${el.css || ''}</style></head><body>${el.html || ''}<script>${el.js || ''}<\/script></body></html>`;
+    let bodyContent = el.html || '';
+    if (el.css && !bodyContent.includes('<style')) {
+      bodyContent = `<style>${el.css}</style>\n` + bodyContent;
+    }
+    if (el.js && !bodyContent.includes('<script')) {
+      bodyContent = bodyContent + `\n<script>${el.js}<\/script>`;
+    }
+    const combinedContent = `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:sans-serif;}</style></head><body>${bodyContent}</body></html>`;
     const escapedSrcDoc = combinedContent
       .replace(/"/g, '&quot;')
       .replace(/</g, '&lt;')
@@ -46,7 +53,12 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-export function generateStandaloneHtml(pages: DocumentPage[], docTitle: string = 'Document'): string {
+export function generateStandaloneHtml(
+  pages: DocumentPage[],
+  docTitle: string = 'Document',
+  pageWidth: number = PAGE_WIDTH,
+  pageHeight: number = PAGE_HEIGHT
+): string {
   const pagesHtml = pages
     .map(
       (page, idx) => `
@@ -88,10 +100,10 @@ export function generateStandaloneHtml(pages: DocumentPage[], docTitle: string =
 
     /* Deterministic Chromium Page Specifications */
     .page-sheet {
-      width: ${PAGE_WIDTH}px;
-      height: ${PAGE_HEIGHT}px;
-      min-height: ${PAGE_HEIGHT}px;
-      max-height: ${PAGE_HEIGHT}px;
+      width: ${pageWidth}px;
+      height: ${pageHeight}px;
+      min-height: ${pageHeight}px;
+      max-height: ${pageHeight}px;
       position: relative;
       background: #ffffff;
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
@@ -116,7 +128,7 @@ export function generateStandaloneHtml(pages: DocumentPage[], docTitle: string =
     }
 
     @page {
-      size: ${PAGE_WIDTH}px ${PAGE_HEIGHT}px;
+      size: ${pageWidth}px ${pageHeight}px;
       margin: 0;
     }
 
@@ -165,4 +177,23 @@ export function downloadHtmlFile(content: string, filename: string = 'document.h
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export function openHtmlInNewTab(content: string) {
+  const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const newTab = window.open(url, '_blank');
+  if (!newTab) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+  // Revoke blob URL after 1 minute to release memory once new tab has loaded
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 60000);
 }

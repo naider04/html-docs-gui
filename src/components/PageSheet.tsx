@@ -19,6 +19,9 @@ interface PageSheetProps {
   onDuplicatePage: (id: string) => void;
   onMovePage: (fromIndex: number, toIndex: number) => void;
   onOpenEmbedEditor: (elementId: string) => void;
+  interactiveEmbedId?: string | null;
+  pageWidth?: number;
+  pageHeight?: number;
 }
 
 export const PageSheet: React.FC<PageSheetProps> = ({
@@ -37,11 +40,17 @@ export const PageSheet: React.FC<PageSheetProps> = ({
   onDuplicatePage,
   onMovePage,
   onOpenEmbedEditor,
+  interactiveEmbedId,
+  pageWidth = PAGE_WIDTH,
+  pageHeight = PAGE_HEIGHT,
 }) => {
   return (
     <div className="flex flex-col items-center">
       {/* Page Header / Meta Bar */}
-      <div className="no-print w-full flex items-center justify-between text-xs text-neutral-500 mb-2 px-1 max-w-[794px]">
+      <div
+        className="no-print w-full flex items-center justify-between text-xs text-neutral-500 mb-2 px-1"
+        style={{ maxWidth: `${pageWidth}px` }}
+      >
         <div className="flex items-center gap-2">
           <span className="font-semibold text-neutral-700 bg-white/80 px-2 py-0.5 rounded shadow-xs border border-neutral-200">
             Page {pageIndex + 1} of {totalPages}
@@ -98,10 +107,10 @@ export const PageSheet: React.FC<PageSheetProps> = ({
             : 'shadow-[0_4px_20px_rgba(0,0,0,0.08)]'
         }`}
         style={{
-          width: `${PAGE_WIDTH}px`,
-          height: `${PAGE_HEIGHT}px`,
-          minHeight: `${PAGE_HEIGHT}px`,
-          maxHeight: `${PAGE_HEIGHT}px`,
+          width: `${pageWidth}px`,
+          height: `${pageHeight}px`,
+          minHeight: `${pageHeight}px`,
+          maxHeight: `${pageHeight}px`,
           overflow: 'hidden',
           boxSizing: 'border-box',
         }}
@@ -135,6 +144,7 @@ export const PageSheet: React.FC<PageSheetProps> = ({
             onUpdate={(updated) => onUpdateElement(el.id, updated)}
             onDelete={() => onDeleteElement(el.id)}
             onOpenEmbedEditor={() => onOpenEmbedEditor(el.id)}
+            isInteractive={interactiveEmbedId === el.id}
           />
         ))}
       </div>

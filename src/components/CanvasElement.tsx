@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DocElement, TextElement, ImageElement, EmbedElement } from '../types';
-import { RotateCw, Edit, Play, Square } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 
 interface CanvasElementProps {
   element: DocElement;
@@ -10,6 +10,7 @@ interface CanvasElementProps {
   onUpdate: (updated: Partial<DocElement>) => void;
   onDelete: () => void;
   onOpenEmbedEditor?: () => void;
+  isInteractive?: boolean;
 }
 
 export const CanvasElement: React.FC<CanvasElementProps> = ({
@@ -20,17 +21,16 @@ export const CanvasElement: React.FC<CanvasElementProps> = ({
   onUpdate,
   onDelete,
   onOpenEmbedEditor,
+  isInteractive = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isEditingText, setIsEditingText] = useState(false);
-  const [isInteractiveMode, setIsInteractiveMode] = useState(false);
   const [activeCropEdge, setActiveCropEdge] = useState<string | null>(null);
 
-  // Close editing and interactive modes when deselected
+  // Close editing when deselected
   useEffect(() => {
     if (!isSelected) {
       setIsEditingText(false);
-      setIsInteractiveMode(false);
     }
   }, [isSelected]);
 
@@ -38,6 +38,15 @@ export const CanvasElement: React.FC<CanvasElementProps> = ({
   const embedSrcDoc = useMemo(() => {
     if (element.type !== 'embed') return '';
     const emb = element as EmbedElement;
+
+    let content = emb.html || '';
+    if (emb.css && !content.includes('<style')) {
+      content = `<style>\n${emb.css}\n</style>\n` + content;
+    }
+    if (emb.js && !content.includes('<script')) {
+      content = content + `\n<script>\n${emb.js}\n<\/script>`;
+    }
+
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -52,25 +61,17 @@ export const CanvasElement: React.FC<CanvasElementProps> = ({
       background: transparent;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    ${emb.css || ''}
   </style>
 </head>
 <body>
-  ${emb.html || ''}
-  <script>
-    try {
-      ${emb.js || ''}
-    } catch (err) {
-      console.error("Embed script error:", err);
-    }
-  <\/script>
+  ${content}
 </body>
 </html>`;
   }, [element]);
 
   // DRAG MOVEMENT HANDLER
   const handleDragStart = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('.handle') || isEditingText || isInteractiveMode) {
+    if ((e.target as HTMLElement).closest('.handle') || isEditingText || isInteractive) {
       return;
     }
     e.stopPropagation();
@@ -408,61 +409,16 @@ export const CanvasElement: React.FC<CanvasElementProps> = ({
               width: '100%',
               height: '100%',
               border: 'none',
-              pointerEvents: isInteractiveMode ? 'auto' : 'none',
+              pointerEvents: isInteractive ? 'auto' : 'none',
             }}
           />
 
-          {/* Transparent overlay: guarantees click, select, drag, and resize ALWAYS work reliably */}
-          {!isInteractiveMode && (
+          {/* Transparent overlay: guarantees click, select, drag, and resize ALWAYS work reliably when not testing */}
+          {!isInteractive && (
             <div
               className="absolute inset-0 z-10 cursor-move bg-transparent"
               title="Click to select, drag to reposition, double-click to edit code"
             />
-          )}
-
-          {/* Action buttons on selection */}
-          {isSelected && (
-            <div className="no-print absolute top-2 right-2 flex items-center gap-1.5 z-30">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsInteractiveMode(!isInteractiveMode);
-                }}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] shadow font-medium transition-colors ${
-                  isInteractiveMode
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    : 'bg-white/95 hover:bg-white text-neutral-700 border border-neutral-300'
-                }`}
-                title={
-                  isInteractiveMode
-                    ? 'Exit interactive mode to reposition/resize'
-                    : 'Test click buttons/inputs inside embed'
-                }
-              >
-                {isInteractiveMode ? (
-                  <>
-                    <Square className="w-2.5 h-2.5 fill-current" />
-                    <span>Done Testing</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-2.5 h-2.5 fill-current text-emerald-600" />
-                    <span>Interact</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onOpenEmbedEditor) onOpenEmbedEditor();
-                }}
-                className="flex items-center gap-1 px-2 py-1 bg-neutral-900/90 hover:bg-neutral-950 text-white rounded text-[11px] shadow font-medium"
-              >
-                <Edit className="w-3 h-3" />
-                <span>Edit Code</span>
-              </button>
-            </div>
           )}
         </div>
       )}

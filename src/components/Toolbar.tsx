@@ -9,11 +9,13 @@ import {
   Maximize2,
   FileCode,
   FileText,
+  Printer,
   ChevronDown,
   ArrowLeftToLine,
   ArrowRightToLine,
   ArrowDownToLine,
 } from 'lucide-react';
+import { PaperFormat, PaperOrientation } from '../types';
 
 interface ToolbarProps {
   onAddText: () => void;
@@ -23,8 +25,13 @@ interface ToolbarProps {
   zoom: number;
   onZoomChange: (newZoom: number) => void;
   onExportHtml: () => void;
+  onPrint: () => void;
   title: string;
   onTitleChange: (newTitle: string) => void;
+  paperFormat: PaperFormat;
+  onPaperFormatChange: (format: PaperFormat) => void;
+  orientation: PaperOrientation;
+  onOrientationChange: (orientation: PaperOrientation) => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -35,8 +42,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   zoom,
   onZoomChange,
   onExportHtml,
+  onPrint,
   title,
   onTitleChange,
+  paperFormat,
+  onPaperFormatChange,
+  orientation,
+  onOrientationChange,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingPlacement, setPendingPlacement] = useState<'left' | 'right' | 'beneath'>('beneath');
@@ -189,6 +201,38 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* Right Controls: Zoom & Export HTML (No Print/PDF) */}
       <div className="flex items-center gap-2">
+        {/* Paper Size & Orientation Selector */}
+        <div className="hidden lg:flex items-center gap-1 bg-neutral-100 rounded-md p-0.5 border border-neutral-200">
+          <select
+            value={paperFormat}
+            onChange={(e) => onPaperFormatChange(e.target.value as PaperFormat)}
+            className="bg-transparent px-2 py-1 text-neutral-800 text-xs font-medium outline-none cursor-pointer"
+            title="Paper Size"
+          >
+            <option value="A4">A4</option>
+            <option value="Letter">Letter</option>
+            <option value="Legal">Legal</option>
+            <option value="A3">A3</option>
+            <option value="A5">A5</option>
+            <option value="Custom">Custom</option>
+          </select>
+          <div className="h-3 w-px bg-neutral-300" />
+          <button
+            onClick={() => onOrientationChange(orientation === 'portrait' ? 'landscape' : 'portrait')}
+            className="px-2 py-1 text-[11px] font-medium text-neutral-700 hover:text-neutral-900 rounded hover:bg-white flex items-center gap-1.5 transition-colors"
+            title={`Current: ${orientation}. Click to toggle orientation`}
+          >
+            <div
+              className={`${
+                orientation === 'portrait' ? 'w-2 h-3' : 'w-3 h-2'
+              } border border-neutral-600 rounded-2xs transition-all`}
+            />
+            <span className="capitalize">{orientation}</span>
+          </button>
+        </div>
+
+        <div className="h-4 w-px bg-neutral-200 hidden lg:block" />
+
         {/* Zoom Controls */}
         <div className="hidden lg:flex items-center bg-neutral-100 rounded-md p-0.5 border border-neutral-200">
           <button
@@ -222,6 +266,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
 
         <div className="h-4 w-px bg-neutral-200 hidden lg:block" />
+
+        {/* Print Button (opens generated HTML in a new tab) */}
+        <button
+          onClick={onPrint}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 border border-neutral-300 rounded-md text-xs font-medium transition-colors shadow-xs"
+          title="Open generated HTML in a new tab"
+        >
+          <Printer className="w-3.5 h-3.5 text-neutral-700" />
+          <span>Print</span>
+        </button>
 
         {/* Deterministic HTML Export */}
         <button

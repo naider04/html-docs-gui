@@ -2,6 +2,7 @@
   "name": "PageCraft Document Editor",
   "description": "Clean multi-page document editor with freeform text, images with crop and resize, rotation, code embeds, and deterministic export.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
-

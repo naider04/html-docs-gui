@@ -7,12 +7,17 @@ import {
   EmbedElement,
   PAGE_WIDTH,
   PAGE_HEIGHT,
+  PaperFormat,
+  PaperOrientation,
+  PAPER_PRESETS,
 } from './types';
 import { Toolbar } from './components/Toolbar';
 import { PageSheet } from './components/PageSheet';
 import { ElementInspector } from './components/ElementInspector';
 import { EmbedEditorModal } from './components/EmbedEditorModal';
-import { generateStandaloneHtml, downloadHtmlFile } from './utils/exportHtml';
+import { PropertyPanel } from './components/PropertyPanel';
+import { PaperSetupPanel } from './components/PaperSetupPanel';
+import { generateStandaloneHtml, downloadHtmlFile, openHtmlInNewTab } from './utils/exportHtml';
 
 // Sample initial image for starter template
 const SAMPLE_IMAGE =
@@ -42,6 +47,15 @@ export default function App() {
 
   // Modal for editing custom HTML+CSS+JS embed
   const [editingEmbedId, setEditingEmbedId] = useState<string | null>(null);
+  const [interactiveEmbedId, setInteractiveEmbedId] = useState<string | null>(null);
+
+  // Paper Format & Orientation State
+  const [paperFormat, setPaperFormat] = useState<PaperFormat>('A4');
+  const [orientation, setOrientation] = useState<PaperOrientation>('portrait');
+  const [customDimensions, setCustomDimensions] = useState<{ width: number; height: number }>({
+    width: 794,
+    height: 1123,
+  });
 
   // In-app clipboard for Ctrl+C, Ctrl+X, Ctrl+V
   const clipboardRef = useRef<DocElement | null>(null);
@@ -122,8 +136,10 @@ export default function App() {
   <div class="metric-val" id="metric">84.6%</div>
   <div class="metric-label">Efficiency Benchmark</div>
   <button class="action-btn" id="btn">Simulate Run</button>
-</div>`,
-          css: `.interactive-box {
+</div>
+
+<style>
+.interactive-box {
   background: linear-gradient(135deg, #0f172a, #1e293b);
   border-radius: 8px;
   color: white;
@@ -134,6 +150,7 @@ export default function App() {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  box-sizing: border-box;
 }
 .metric-val {
   font-size: 32px;
@@ -158,11 +175,15 @@ export default function App() {
   cursor: pointer;
   transition: 0.15s;
 }
-.action-btn:hover { background: #1d4ed8; }`,
-          js: `document.getElementById('btn').addEventListener('click', function() {
+.action-btn:hover { background: #1d4ed8; }
+</style>
+
+<script>
+document.getElementById('btn').addEventListener('click', function() {
   const newVal = (70 + Math.random() * 25).toFixed(1) + '%';
   document.getElementById('metric').textContent = newVal;
-});`,
+});
+</script>`,
         } as EmbedElement,
       ],
     },
@@ -396,12 +417,46 @@ export default function App() {
       height: 220,
       rotation: 0,
       zIndex: Date.now() % 1000,
-      html: `<div style="padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center;">
-  <h4 style="margin: 0 0 8px; color: #0f172a;">Live HTML Component</h4>
-  <p style="margin: 0; color: #64748b; font-size: 13px;">Click "Edit Code" to customize HTML, CSS, & JS</p>
-</div>`,
-      css: '',
-      js: '',
+      html: `<div class="card">
+  <h4>Live HTML Component</h4>
+  <p>Edit HTML, &lt;style&gt;, and &lt;script&gt; in one editor</p>
+  <button id="counter-btn" class="btn">Clicks: 0</button>
+</div>
+
+<style>
+.card {
+  padding: 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-align: center;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+h4 { margin: 0 0 4px; color: #0f172a; font-family: sans-serif; }
+p { margin: 0 0 12px; color: #64748b; font-size: 12px; font-family: sans-serif; }
+.btn {
+  background: #0f172a;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+</style>
+
+<script>
+let count = 0;
+document.getElementById('counter-btn').addEventListener('click', function() {
+  count++;
+  this.textContent = 'Clicks: ' + count;
+});
+</script>`,
     };
 
     updatePagesWithHistory((prev) =>
@@ -767,23 +822,63 @@ export default function App() {
     return () => window.removeEventListener('paste', handlePaste);
   }, [handlePasteClipboardElement, handleAddImage]);
 
-  // Export to Deterministic HTML File (Without any PDF code)
+  // Active page helpers
+  const activePageIndex = useMemo(
+    () => Math.max(0, pages.findIndex((p) => p.id === activePageId)),
+    [pages, activePageId]
+  );
+  const activePage = pages[activePageIndex];
+
+  // Dynamic Paper Dimensions based on format, orientation, or custom size
+  const { pageWidth, pageHeight } = useMemo(() => {
+    let baseW = 794;
+    let baseH = 1123;
+    if (paperFormat === 'Custom') {
+      baseW = customDimensions.width;
+      baseH = customDimensions.height;
+    } else {
+      const preset = PAPER_PRESETS[paperFormat] || PAPER_PRESETS.A4;
+      baseW = preset.width;
+      baseH = preset.height;
+    }
+
+    if (orientation === 'landscape') {
+      return {
+        pageWidth: Math.max(baseW, baseH),
+        pageHeight: Math.min(baseW, baseH),
+      };
+    } else {
+      return {
+        pageWidth: Math.min(baseW, baseH),
+        pageHeight: Math.max(baseW, baseH),
+      };
+    }
+  }, [paperFormat, orientation, customDimensions]);
+
+  // Export to Deterministic HTML File
   const handleExportHtml = () => {
-    const htmlString = generateStandaloneHtml(pages, docTitle);
+    const htmlString = generateStandaloneHtml(pages, docTitle, pageWidth, pageHeight);
     downloadHtmlFile(htmlString, `${docTitle.toLowerCase().replace(/\s+/g, '-')}.html`);
     showToast('Downloaded deterministic HTML');
   };
 
+  // Print: Opens the generated HTML in a new tab (without converting to PDF or triggering print dialog)
+  const handlePrint = () => {
+    const htmlString = generateStandaloneHtml(pages, docTitle, pageWidth, pageHeight);
+    openHtmlInNewTab(htmlString);
+    showToast('Opened HTML in a new tab');
+  };
+
   // Save changes from EmbedEditorModal
-  const handleSaveEmbed = (updates: { html: string; css: string; js: string }) => {
+  const handleSaveEmbed = (combinedHtml: string) => {
     if (!editingEmbedId) return;
-    handleUpdateElement(editingEmbedId, updates);
-    showToast('Updated embed component');
+    handleUpdateElement(editingEmbedId, { html: combinedHtml });
+    showToast('Updated HTML embed');
   };
 
   return (
-    <div className="min-h-screen bg-[#eceff1] flex flex-col antialiased">
-      {/* Top Application Toolbar */}
+    <div className="h-screen w-screen overflow-hidden bg-[#eceff1] flex flex-col antialiased">
+      {/* Top Application Toolbar - Fixed */}
       <Toolbar
         onAddText={handleAddText}
         onAddImage={handleAddImage}
@@ -792,13 +887,18 @@ export default function App() {
         zoom={zoom}
         onZoomChange={setZoom}
         onExportHtml={handleExportHtml}
+        onPrint={handlePrint}
         title={docTitle}
         onTitleChange={setDocTitle}
+        paperFormat={paperFormat}
+        onPaperFormatChange={setPaperFormat}
+        orientation={orientation}
+        onOrientationChange={setOrientation}
       />
 
-      {/* Contextual Element Inspector */}
+      {/* Contextual Element Inspector - Floats at top center, fixed and does not scroll */}
       {selectedElement && (
-        <div className="no-print sticky top-[53px] z-40 flex justify-center py-2 px-4 pointer-events-none">
+        <div className="no-print absolute top-[52px] left-1/2 -translate-x-1/2 z-40 pointer-events-none">
           <div className="pointer-events-auto">
             <ElementInspector
               element={selectedElement}
@@ -810,47 +910,89 @@ export default function App() {
               onSendBackward={handleSendBackward}
               onOpenEmbedEditor={() => setEditingEmbedId(selectedElement.id)}
               onAlignImagePosition={handleAlignImagePosition}
+              isInteractive={interactiveEmbedId === selectedElement.id}
+              onToggleInteractive={() =>
+                setInteractiveEmbedId((prev) => (prev === selectedElement.id ? null : selectedElement.id))
+              }
             />
           </div>
         </div>
       )}
 
-      {/* Main Canvas Area - Dominant White Paper Sheet */}
-      <main
-        className="flex-1 overflow-auto flex flex-col items-center py-8 px-4 print-page-container"
-        onClick={() => setSelectedElementId(null)}
-      >
-        <div
-          style={{
-            transform: `scale(${zoom})`,
-            transformOrigin: 'top center',
-            transition: 'transform 0.15s ease-out',
-            width: `${PAGE_WIDTH}px`,
+      {/* Workspace Area: Fixed Left Setup Panel + Scrollable Canvas + Fixed Right Property Panel */}
+      <div className="flex-1 min-h-0 flex overflow-hidden relative">
+        {/* Paper & Sheet Setup Panel on the Left - FIXED (never scrolls when viewing other pages) */}
+        <PaperSetupPanel
+          paperFormat={paperFormat}
+          onPaperFormatChange={setPaperFormat}
+          orientation={orientation}
+          onOrientationChange={setOrientation}
+          pageWidth={pageWidth}
+          pageHeight={pageHeight}
+          onCustomDimensionsChange={(w, h) => setCustomDimensions({ width: w, height: h })}
+          pages={pages}
+          activePageId={activePageId}
+          onSelectPage={setActivePageId}
+          onAddPage={() => handleAddPage()}
+          onDuplicatePage={handleDuplicatePage}
+          onDeletePage={handleDeletePage}
+          onMovePage={handleMovePage}
+        />
+
+        {/* Main Canvas Area - Dominant White Paper Sheet (Only this container scrolls) */}
+        <main
+          className="flex-1 h-full min-w-0 overflow-y-auto overflow-x-auto flex flex-col items-center py-8 px-4 print-page-container"
+          onClick={() => {
+            setSelectedElementId(null);
+            setInteractiveEmbedId(null);
           }}
-          className="flex flex-col items-center"
         >
-          {pages.map((page, idx) => (
-            <PageSheet
-              key={page.id}
-              page={page}
-              pageIndex={idx}
-              totalPages={pages.length}
-              isActive={activePageId === page.id}
-              selectedElementId={selectedElementId}
-              zoom={zoom}
-              onSelectPage={() => setActivePageId(page.id)}
-              onSelectElement={(id) => setSelectedElementId(id)}
-              onUpdateElement={handleUpdateElement}
-              onDeleteElement={handleDeleteElement}
-              onAddNextPage={handleAddPage}
-              onDeletePage={handleDeletePage}
-              onDuplicatePage={handleDuplicatePage}
-              onMovePage={handleMovePage}
-              onOpenEmbedEditor={(embedId) => setEditingEmbedId(embedId)}
-            />
-          ))}
-        </div>
-      </main>
+          <div
+            style={{
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top center',
+              transition: 'transform 0.15s ease-out',
+              width: `${pageWidth}px`,
+            }}
+            className="flex flex-col items-center"
+          >
+            {pages.map((page, idx) => (
+              <PageSheet
+                key={page.id}
+                page={page}
+                pageIndex={idx}
+                totalPages={pages.length}
+                isActive={activePageId === page.id}
+                selectedElementId={selectedElementId}
+                zoom={zoom}
+                onSelectPage={() => setActivePageId(page.id)}
+                onSelectElement={(id) => {
+                  setSelectedElementId(id);
+                  if (id !== interactiveEmbedId) {
+                    setInteractiveEmbedId(null);
+                  }
+                }}
+                onUpdateElement={handleUpdateElement}
+                onDeleteElement={handleDeleteElement}
+                onAddNextPage={handleAddPage}
+                onDeletePage={handleDeletePage}
+                onDuplicatePage={handleDuplicatePage}
+                onMovePage={handleMovePage}
+                onOpenEmbedEditor={(embedId) => setEditingEmbedId(embedId)}
+                interactiveEmbedId={interactiveEmbedId}
+                pageWidth={pageWidth}
+                pageHeight={pageHeight}
+              />
+            ))}
+          </div>
+        </main>
+
+        {/* Live Numerical Properties Panel on the Right - FIXED (never scrolls when viewing other pages) */}
+        <PropertyPanel
+          selectedElement={selectedElement}
+          onUpdateElement={handleUpdateElement}
+        />
+      </div>
 
       {/* Custom HTML + CSS + JS Embed Modal */}
       <EmbedEditorModal
